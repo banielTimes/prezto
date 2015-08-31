@@ -17,8 +17,8 @@ fi
 # Editors
 #
 
-export EDITOR='nano'
-export VISUAL='nano'
+export EDITOR='vim'
+export VISUAL='vim'
 export PAGER='less'
 
 #
@@ -41,9 +41,102 @@ typeset -gU cdpath fpath mailpath path
 #   $cdpath
 # )
 
+# My paths
+
+# Auto-Proxy-Configuration
+
+[ "$( networksetup -getcurrentlocation )" = "MMS WLAN/LAN" ] && netservice="Thunderbolt Ethernet" || netservice="Wi-Fi"
+
+[ $( networksetup -getwebproxy ${netservice} | sed -n 3p | sed 's#Port: ##' ) -ne 0 ] && macproxy=http://$( networksetup -getwebproxy ${netservice} | sed -n 2p | sed 's#Server: ##' ):$( networksetup -getwebproxy ${netservice} | sed -n 3p | sed 's#Port: ##' )
+
+export http_proxy=${macproxy}
+export https_proxy=${macproxy}
+export no_proxy=git.t-systems-mms.eu,localhost,127.0.0.1,binaries.mms-at-work.de
+export GOPATH=$HOME/playground/go
+export OMNIBUS_INSTALL_URL="http://www.opscode.com/chef/install.sh"
+export SVN_EDITOR=vim
+export EDITOR=vim
+export HOMEBREW_CASK_OPTS="--appdir=/Applications"
+export CHEFPATH=$HOME/.chefdk/gem/ruby/2.1.0/bin
+export HOMEBREW_GITHUB_API_TOKEN=0a1ef34cfa7e642787305af309e771e647a83fdf
+export GROOVY_HOME=/usr/local/opt/groovy/libexec
+
+source ~/.one/one_env
+
+eval "$(thefuck --alias)"
+eval "$(rbenv init -)"
+eval "$(jenv init -)"
+eval "$(direnv hook zsh)"
+
+if [ -f $(brew --prefix)/etc/brew-wrap ];then
+  source $(brew --prefix)/etc/brew-wrap
+fi
+
+# Atom proxy configuration
+#apm config set http-proxy ${macproxy}
+#apm config set https-proxy ${macproxy}
+
+# My functions
+
+function docker_use() {
+  eval "$(docker-machine env dev)"
+  export NO_PROXY=$(echo $DOCKER_HOST | sed 's/tcp:\/\/\([^:]*\).*/\1/')
+}
+
+function proxy() {
+  if [ "$1" = "mms" ]; then
+    export http_proxy=http://proxy.mms-dresden.telekom.de:8080
+    export https_proxy=http://proxy.mms-dresden.telekom.de:8080
+  elif [ "$1" = "none" ]; then
+    export http_proxy=
+    export https_proxy=
+  else
+    export http_proxy=$1
+    export https_proxy=$1
+  fi
+
+  echo $http_proxy
+}
+
+function aws_get_session_token() {
+
+  # variables
+  ACCOUNT_ID="751435302723"
+  PRJ_ACCOUNT_ID="492637116524"
+  ACCOUNT="daniel.sy@t-systems.com"
+  ROLE_SESSION_NAME="$USER"
+  AWS_CREDENTIALS_FILE="$HOME/.aws/credentials"
+
+  unset AWS_ACCESS_KEY_ID
+  unset AWS_SECRET_ACCESS_KEY
+  unset AWS_SECURITY_TOKEN
+
+  echo "get session token"
+  credentials=`aws sts get-session-token --duration-seconds 3600 --serial-number arn:aws:iam::$ACCOUNT_ID:mfa/$ACCOUNT --token-code $1`
+  export AWS_ACCESS_KEY_ID=$(echo $credentials | jq -r ".Credentials|.AccessKeyId")
+  export AWS_SECRET_ACCESS_KEY=$(echo $credentials | jq -r ".Credentials|.SecretAccessKey")
+  export AWS_SECURITY_TOKEN=$(echo $credentials | jq -r ".Credentials|.SessionToken")
+  export AWS_SESSION_TOKEN=$(echo $credentials | jq -r ".Credentials|.SessionToken")
+
+  echo "assume role"
+  credentials=`aws sts assume-role --duration-seconds 3600 --role-arn arn:aws:iam::"$PRJ_ACCOUNT_ID":role/AccountAdmin --role-session-name "$ROLE_SESSION_NAME"`
+  export AWS_ACCESS_KEY_ID=$(echo $credentials | jq -r ".Credentials|.AccessKeyId")
+  export AWS_SECRET_ACCESS_KEY=$(echo $credentials | jq -r ".Credentials|.SecretAccessKey")
+  export AWS_SECURITY_TOKEN=$(echo $credentials | jq -r ".Credentials|.SessionToken")
+  export AWS_SESSION_TOKEN=$(echo $credentials | jq -r ".Credentials|.SessionToken")
+
+  # save credentials
+  # printf '[default]\naws_access_key_id = %s\naws_secret_access_key = %s\naws_session_token = %s' "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" "$AWS_SECURITY_TOKEN" > "$AWS_CREDENTIALS_FILE"
+  echo "done"
+}
+
 # Set the list of directories that Zsh searches for programs.
 path=(
   /usr/local/{bin,sbin}
+  $GOPATH/bin
+  $CHEFPATH
+  $HOME/.jenv/bin
+  /opt/Sencha/Cmd
   $path
 )
 
